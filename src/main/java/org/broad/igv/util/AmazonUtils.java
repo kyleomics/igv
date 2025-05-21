@@ -150,23 +150,23 @@ public class AmazonUtils {
             log.debug("fetch credentials");
             OAuthProvider provider = OAuthUtils.getInstance().getAWSProvider();
 
-            JsonObject response = provider.getAuthorizationResponse();
+            String idToken = provider.getIdToken();
 
-            setCredentialsFromOauthResponse(response);
+            setCredentialsFromIdToken(idToken);
         }
         return cognitoAWSCredentials;
     }
 
-    private static void setCredentialsFromOauthResponse(JsonObject response) {
+    private static void setCredentialsFromIdToken(String idToken) {
 
         JsonObject igv_oauth_conf = GetCognitoConfig();
 
-        JsonObject payload = JWTParser.getPayload(response.get("id_token").getAsString());
+        JsonObject payload = JWTParser.getPayload(idToken);
 
         log.debug("JWT payload id token: " + payload);
 
         // Collect necessary information from federated IdP for Authentication purposes
-        String idTokenStr = response.get("id_token").getAsString();
+        String idTokenStr = idToken;
         String idProvider = payload.get("iss").toString().replace("https://", "")
                 .replace("\"", "");
         String email = payload.get("email").getAsString();

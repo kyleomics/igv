@@ -42,6 +42,8 @@ public class OAuthProvider {
     private String tokenEndpoint;
     private String accessToken;
     private String refreshToken;
+    private String idToken;
+    private long idTokenExpirationTime;
     private String codeChallenge;
     private String codeVerifier;
     private String codeChallengeMethod;
@@ -223,10 +225,17 @@ public class OAuthProvider {
             accessToken = response.get("access_token").getAsString();
             refreshToken = response.get("refresh_token").getAsString();
             expirationTime = System.currentTimeMillis() + response.get("expires_in").getAsInt() * 1000;
+            if (response.has("id_token")) {
+                idToken = response.get("id_token").getAsString();
+                JsonObject payload = JWTParser.getPayload(idToken);
+                if (payload.has("exp")) {
+                    idTokenExpirationTime = payload.get("exp").getAsLong() * 1000;
+                }
+            }
 
             // Populate this class with user profile attributes
-            if (response.has("id_token")) {
-                JsonObject payload = JWTParser.getPayload(response.get("id_token").getAsString());
+            if (idToken != null) {
+                JsonObject payload = JWTParser.getPayload(idToken);
                 fetchUserProfile(payload);
             }
 
@@ -280,6 +289,13 @@ public class OAuthProvider {
                 refreshToken = response.getAsJsonPrimitive("refresh_token").getAsString();
             }
             expirationTime = System.currentTimeMillis() + response.getAsJsonPrimitive("expires_in").getAsInt() * 1000;
+            if (response.has("id_token")) {
+                idToken = response.get("id_token").getAsString();
+                JsonObject payload = JWTParser.getPayload(idToken);
+                if (payload.has("exp")) {
+                    idTokenExpirationTime = payload.get("exp").getAsLong() * 1000;
+                }
+            }
         } else {
             // Refresh token has failed, reauthorize from scratch
             logout();
@@ -329,6 +345,20 @@ public class OAuthProvider {
         }
 
         return accessToken;
+    }
+
+    public String getIdToken() {
+        if (idToken == null || (System.currentTimeMillis() > (idTokenExpirationTime - TOKEN_EXPIRE_GRACE_TIME))) {
+            log.debug("Refreshing id token!");
+            if (refreshToken != null) {
+                try {
+                    this.refreshAccessToken();
+                } catch (IOException e) {
+                    log.error("Error refreshing id token", e);
+                }
+            }
+        }
+        return idToken;
     }
 
     /**
